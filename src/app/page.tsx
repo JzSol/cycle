@@ -128,6 +128,11 @@ const capsuleLabels: Record<CapsuleKey, string> = {
   card: "Cardarine",
 };
 
+const parseCapsuleCount = (value: string) => {
+  const match = value.match(/\d+/);
+  return match ? Number(match[0]) : 0;
+};
+
 type StoredProgress = {
   checkedDays: Record<number, boolean>;
   dailyCapsules: Record<number, DailyCapsules>;
@@ -156,11 +161,30 @@ export default function Home() {
     });
   }, []);
 
+  const defaultCapsulesByDay = useMemo<Record<number, DailyCapsules>>(() => {
+    const defaults: Record<number, DailyCapsules> = {};
+    weeks.forEach((week) => {
+      const dayDefaults: DailyCapsules = {
+        osta: parseCapsuleCount(week.osta),
+        rad: parseCapsuleCount(week.rad),
+        card: parseCapsuleCount(week.card),
+      };
+      week.dayNumbers.forEach((day) => {
+        defaults[day] = dayDefaults;
+      });
+    });
+    return defaults;
+  }, [weeks]);
+
   useEffect(() => {
     const totalDays = cycleData.reduce((sum, week) => sum + week.days, 0);
     const emptyCapsules: Record<number, DailyCapsules> = {};
     for (let day = 1; day <= totalDays; day += 1) {
-      emptyCapsules[day] = { osta: 0, rad: 0, card: 0 };
+      emptyCapsules[day] = defaultCapsulesByDay[day] ?? {
+        osta: 0,
+        rad: 0,
+        card: 0,
+      };
     }
 
     if (typeof window === "undefined") {
@@ -370,7 +394,11 @@ export default function Home() {
                         id={`day${day}-osta`}
                         type="number"
                         min={0}
-                        value={dailyCapsules[day]?.osta ?? 0}
+                        value={
+                          dailyCapsules[day]?.osta ??
+                          defaultCapsulesByDay[day]?.osta ??
+                          0
+                        }
                         onChange={handleCapsuleChange(day, "osta")}
                       />
                     </div>
@@ -380,7 +408,11 @@ export default function Home() {
                         id={`day${day}-rad`}
                         type="number"
                         min={0}
-                        value={dailyCapsules[day]?.rad ?? 0}
+                        value={
+                          dailyCapsules[day]?.rad ??
+                          defaultCapsulesByDay[day]?.rad ??
+                          0
+                        }
                         onChange={handleCapsuleChange(day, "rad")}
                       />
                     </div>
@@ -390,7 +422,11 @@ export default function Home() {
                         id={`day${day}-card`}
                         type="number"
                         min={0}
-                        value={dailyCapsules[day]?.card ?? 0}
+                        value={
+                          dailyCapsules[day]?.card ??
+                          defaultCapsulesByDay[day]?.card ??
+                          0
+                        }
                         onChange={handleCapsuleChange(day, "card")}
                       />
                     </div>
