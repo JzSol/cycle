@@ -199,12 +199,35 @@ export default function Home() {
       }
       const parsed = JSON.parse(raw) as StoredProgress;
       setCheckedDays(parsed.checkedDays ?? {});
-      setDailyCapsules(parsed.dailyCapsules ?? emptyCapsules);
+      const stored = parsed.dailyCapsules ?? {};
+      const hasAnyNonZero = Object.values(stored).some((entry) => {
+        return (
+          (entry?.osta ?? 0) > 0 ||
+          (entry?.rad ?? 0) > 0 ||
+          (entry?.card ?? 0) > 0
+        );
+      });
+      const mergedCapsules: Record<number, DailyCapsules> = {};
+      for (let day = 1; day <= totalDays; day += 1) {
+        const storedEntry = stored[day] ?? {};
+        mergedCapsules[day] = {
+          osta: hasAnyNonZero
+            ? storedEntry.osta ?? emptyCapsules[day].osta
+            : emptyCapsules[day].osta,
+          rad: hasAnyNonZero
+            ? storedEntry.rad ?? emptyCapsules[day].rad
+            : emptyCapsules[day].rad,
+          card: hasAnyNonZero
+            ? storedEntry.card ?? emptyCapsules[day].card
+            : emptyCapsules[day].card,
+        };
+      }
+      setDailyCapsules(mergedCapsules);
       setStartDate(parsed.startDate ?? "");
     } catch (error) {
       setDailyCapsules(emptyCapsules);
     }
-  }, []);
+  }, [defaultCapsulesByDay]);
 
   const handleToggle = (day: number) => {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,6 +306,14 @@ export default function Home() {
     };
   }, [dailyCapsules]);
 
+  const usedCapsules = useMemo(() => {
+    return {
+      osta: capsuleSupply.osta - remainingCapsules.osta,
+      rad: capsuleSupply.rad - remainingCapsules.rad,
+      card: capsuleSupply.card - remainingCapsules.card,
+    };
+  }, [remainingCapsules]);
+
   return (
     <div className="container">
       <header className="header">
@@ -323,6 +354,10 @@ export default function Home() {
               <div className="capsule-stat">
                 <span>Supply:</span>
                 <strong>{capsuleSupply[key]}</strong>
+              </div>
+              <div className="capsule-stat">
+                <span>Used:</span>
+                <strong>{usedCapsules[key]}</strong>
               </div>
               <div className="capsule-stat">
                 <span>Remaining:</span>
