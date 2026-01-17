@@ -148,6 +148,10 @@ export default function Home() {
   >({});
   const [startDate, setStartDate] = useState<string>("");
 
+  const totalDays = useMemo(() => {
+    return cycleData.reduce((sum, week) => sum + week.days, 0);
+  }, []);
+
   const weeks = useMemo<WeekWithDays[]>(() => {
     let dayCounter = 1;
     return cycleData.map((week) => {
@@ -177,7 +181,6 @@ export default function Home() {
   }, [weeks]);
 
   useEffect(() => {
-    const totalDays = cycleData.reduce((sum, week) => sum + week.days, 0);
     const emptyCapsules: Record<number, DailyCapsules> = {};
     for (let day = 1; day <= totalDays; day += 1) {
       emptyCapsules[day] = defaultCapsulesByDay[day] ?? {
@@ -292,27 +295,41 @@ export default function Home() {
     });
   };
 
-  const remainingCapsules = useMemo(() => {
+  const usedCapsules = useMemo(() => {
     const totals: Record<CapsuleKey, number> = { osta: 0, rad: 0, card: 0 };
-    Object.values(dailyCapsules).forEach((entry) => {
+    Object.entries(dailyCapsules).forEach(([dayKey, entry]) => {
+      const day = Number(dayKey);
+      if (!checkedDays[day]) {
+        return;
+      }
       totals.osta += entry.osta || 0;
       totals.rad += entry.rad || 0;
       totals.card += entry.card || 0;
     });
-    return {
-      osta: capsuleSupply.osta - totals.osta,
-      rad: capsuleSupply.rad - totals.rad,
-      card: capsuleSupply.card - totals.card,
-    };
-  }, [dailyCapsules]);
+    return totals;
+  }, [dailyCapsules, checkedDays]);
 
-  const usedCapsules = useMemo(() => {
+  const plannedCapsules = useMemo(() => {
+    const totals: Record<CapsuleKey, number> = { osta: 0, rad: 0, card: 0 };
+    for (let day = 1; day <= totalDays; day += 1) {
+      const entry = dailyCapsules[day] ?? defaultCapsulesByDay[day];
+      if (!entry) {
+        continue;
+      }
+      totals.osta += entry.osta || 0;
+      totals.rad += entry.rad || 0;
+      totals.card += entry.card || 0;
+    }
+    return totals;
+  }, [dailyCapsules, defaultCapsulesByDay, totalDays]);
+
+  const remainingCapsules = useMemo(() => {
     return {
-      osta: capsuleSupply.osta - remainingCapsules.osta,
-      rad: capsuleSupply.rad - remainingCapsules.rad,
-      card: capsuleSupply.card - remainingCapsules.card,
+      osta: capsuleSupply.osta - plannedCapsules.osta,
+      rad: capsuleSupply.rad - plannedCapsules.rad,
+      card: capsuleSupply.card - plannedCapsules.card,
     };
-  }, [remainingCapsules]);
+  }, [plannedCapsules]);
 
   return (
     <div className="container">
