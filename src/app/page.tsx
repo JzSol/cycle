@@ -247,7 +247,9 @@ export default function Home() {
   };
 
   const handleCapsuleChange = (day: number, key: CapsuleKey) => {
-    return (event: React.ChangeEvent<HTMLInputElement>) => {
+    return (
+      event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    ) => {
       const value = Number(event.target.value);
       const safeValue = Number.isNaN(value) ? 0 : Math.max(0, value);
       setDailyCapsules((prev) => ({
@@ -454,45 +456,57 @@ export default function Home() {
                   <div className="capsule-inputs">
                     <div className="capsule-input">
                       <label htmlFor={`day${day}-osta`}>Osta caps</label>
-                      <input
-                        id={`day${day}-osta`}
-                        type="number"
-                        min={0}
-                        value={
-                          dailyCapsules[day]?.osta ??
-                          defaultCapsulesByDay[day]?.osta ??
-                          0
-                        }
-                        onChange={handleCapsuleChange(day, "osta")}
-                      />
+                    <select
+                      id={`day${day}-osta`}
+                      value={
+                        dailyCapsules[day]?.osta ??
+                        defaultCapsulesByDay[day]?.osta ??
+                        0
+                      }
+                      onChange={handleCapsuleChange(day, "osta")}
+                    >
+                      {Array.from({ length: 6 }, (_, index) => (
+                        <option key={index} value={index}>
+                          {index}
+                        </option>
+                      ))}
+                    </select>
                     </div>
                     <div className="capsule-input">
                       <label htmlFor={`day${day}-rad`}>RAD caps</label>
-                      <input
+                      <select
                         id={`day${day}-rad`}
-                        type="number"
-                        min={0}
                         value={
                           dailyCapsules[day]?.rad ??
                           defaultCapsulesByDay[day]?.rad ??
                           0
                         }
                         onChange={handleCapsuleChange(day, "rad")}
-                      />
+                      >
+                        {Array.from({ length: 6 }, (_, index) => (
+                          <option key={index} value={index}>
+                            {index}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="capsule-input">
                       <label htmlFor={`day${day}-card`}>Card caps</label>
-                      <input
+                      <select
                         id={`day${day}-card`}
-                        type="number"
-                        min={0}
                         value={
                           dailyCapsules[day]?.card ??
                           defaultCapsulesByDay[day]?.card ??
                           0
                         }
                         onChange={handleCapsuleChange(day, "card")}
-                      />
+                      >
+                        {Array.from({ length: 6 }, (_, index) => (
+                          <option key={index} value={index}>
+                            {index}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div className="checkbox-container">
