@@ -139,14 +139,13 @@ type StoredProgress = {
   startDate?: string;
 };
 
-const STORAGE_KEY = "cycle-progress-v1";
-
 export default function Home() {
   const [checkedDays, setCheckedDays] = useState<Record<number, boolean>>({});
   const [dailyCapsules, setDailyCapsules] = useState<
     Record<number, DailyCapsules>
   >({});
   const [startDate, setStartDate] = useState<string>("");
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const totalDays = useMemo(() => {
     return cycleData.reduce((sum, week) => sum + week.days, 0);
@@ -190,47 +189,47 @@ export default function Home() {
       };
     }
 
-    if (typeof window === "undefined") {
-      return;
+    let isCancelled = false;
+
+    async function load() {
+      try {
+        const response = await fetch("/api/progress", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Failed to load progress: ${response.status}`);
+        }
+        const parsed = (await response.json()) as StoredProgress;
+        if (isCancelled) {
+          return;
+        }
+        setCheckedDays(parsed.checkedDays ?? {});
+        const stored = parsed.dailyCapsules ?? {};
+        const mergedCapsules: Record<number, DailyCapsules> = {};
+        for (let day = 1; day <= totalDays; day += 1) {
+          const storedEntry = stored[day] ?? {};
+          mergedCapsules[day] = {
+            osta: storedEntry.osta ?? emptyCapsules[day].osta,
+            rad: storedEntry.rad ?? emptyCapsules[day].rad,
+            card: storedEntry.card ?? emptyCapsules[day].card,
+          };
+        }
+        setDailyCapsules(mergedCapsules);
+        setStartDate(parsed.startDate ?? "");
+      } catch (error) {
+        if (!isCancelled) {
+          setDailyCapsules(emptyCapsules);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoaded(true);
+        }
+      }
     }
 
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        setDailyCapsules(emptyCapsules);
-        return;
-      }
-      const parsed = JSON.parse(raw) as StoredProgress;
-      setCheckedDays(parsed.checkedDays ?? {});
-      const stored = parsed.dailyCapsules ?? {};
-      const hasAnyNonZero = Object.values(stored).some((entry) => {
-        return (
-          (entry?.osta ?? 0) > 0 ||
-          (entry?.rad ?? 0) > 0 ||
-          (entry?.card ?? 0) > 0
-        );
-      });
-      const mergedCapsules: Record<number, DailyCapsules> = {};
-      for (let day = 1; day <= totalDays; day += 1) {
-        const storedEntry = stored[day] ?? {};
-        mergedCapsules[day] = {
-          osta: hasAnyNonZero
-            ? storedEntry.osta ?? emptyCapsules[day].osta
-            : emptyCapsules[day].osta,
-          rad: hasAnyNonZero
-            ? storedEntry.rad ?? emptyCapsules[day].rad
-            : emptyCapsules[day].rad,
-          card: hasAnyNonZero
-            ? storedEntry.card ?? emptyCapsules[day].card
-            : emptyCapsules[day].card,
-        };
-      }
-      setDailyCapsules(mergedCapsules);
-      setStartDate(parsed.startDate ?? "");
-    } catch (error) {
-      setDailyCapsules(emptyCapsules);
-    }
-  }, [defaultCapsulesByDay]);
+    load();
+    return () => {
+      isCancelled = true;
+    };
+  }, [defaultCapsulesByDay, totalDays]);
 
   const handleToggle = (day: number) => {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,20 +261,33 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (!isLoaded) {
       return;
     }
+
+    const controller = new AbortController();
     const payload: StoredProgress = {
       checkedDays,
       dailyCapsules,
       startDate: startDate || undefined,
     };
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch (error) {
-      // If storage is unavailable or full, avoid breaking the UI.
-    }
-  }, [checkedDays, dailyCapsules, startDate]);
+
+    const timeout = setTimeout(() => {
+      fetch("/api/progress", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      }).catch(() => {
+        // Avoid breaking UI if save fails; user can retry by making another change.
+      });
+    }, 400);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [checkedDays, dailyCapsules, startDate, isLoaded]);
 
   const handleStartDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setStartDate(event.target.value);
