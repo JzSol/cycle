@@ -1,28 +1,33 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
-
-if (!uri) {
-  throw new Error("Missing MONGODB_URI. Add it to your environment.");
-}
-
 declare global {
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-let clientPromise: Promise<MongoClient>;
+const isValidMongoUri = (value?: string): value is string => {
+  return Boolean(
+    value?.startsWith("mongodb://") || value?.startsWith("mongodb+srv://")
+  );
+};
 
-if (process.env.NODE_ENV === "development") {
-  if (!global._mongoClientPromise) {
-    const client = new MongoClient(uri);
-    global._mongoClientPromise = client.connect();
+export const getMongoClientPromise = () => {
+  const uri = process.env.MONGODB_URI;
+  if (!isValidMongoUri(uri)) {
+    throw new Error(
+      "Invalid MONGODB_URI. It must start with mongodb:// or mongodb+srv://"
+    );
   }
-  clientPromise = global._mongoClientPromise;
-} else {
-  const client = new MongoClient(uri);
-  clientPromise = client.connect();
-}
 
-export default clientPromise;
+  if (process.env.NODE_ENV === "development") {
+    if (!global._mongoClientPromise) {
+      const client = new MongoClient(uri);
+      global._mongoClientPromise = client.connect();
+    }
+    return global._mongoClientPromise;
+  }
+
+  const client = new MongoClient(uri);
+  return client.connect();
+};
 
